@@ -1,4 +1,43 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+Injury Tracking System
+
+Welcome to the Injury Tracking System project! This web application is designed to help organizations, like the police, record and monitor reported injuries efficiently. Below are the features implemented in this project.
+
+1. Report
+
+Users can create, view, update, and delete an injury report, including:
+
+    Name of Reporter
+    Date & Time of Injury
+    Body Map: Users can encircle different areas of injury on a body map image. Each encircled area is automatically labeled.
+    List of Injuries: Users can provide details for each encircled area.
+
+2. List of Reports
+
+Users can view a list/table of all reported injuries with options to:
+
+    See reporter's name, injury date & time, and report date
+    Sort and search by various fields
+    Filter by start and end dates of injury and report
+    Download report as a CSV file format
+
+3. User Authentication
+
+Users can register using username/password or log in with Google/email via Auth0. Authenticated users can log in/out and view task history.
+4. UI/UX
+
+The application features a clean, user-friendly interface built with Tailwind CSS & Ant design library. It is responsive, visually appealing, and works seamlessly on both desktop and mobile devices.
+Bonus Features
+5. Progressive Web App (PWA)
+
+The application is built as a Progressive Web App, allowing users to install it on their home screen. It works offline and provides an app-like experience across devices and platforms.
+6. Automatic Location Detection
+
+Instead of just numbering, the system automatically detects and labels injured areas (e.g., 'left hand' or 'left foot').
+7. Analytics Dashboard
+
+The application includes an analytics dashboard displaying relevant metrics in visually appealing visualizations.
+Getting Started
+
 
 ## Getting Started
 
