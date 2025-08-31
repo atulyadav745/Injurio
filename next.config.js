@@ -1,6 +1,8 @@
-/** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-}
+  experimental: {
+    esmExternals: false,
+  },
+  transpilePackages: ['antd', '@ant-design/icons', '@ant-design/icons-svg', 'rc-util', 'rc-pagination', 'rc-picker', 'rc-table', 'rc-input', 'rc-tree'],
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

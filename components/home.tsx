@@ -106,13 +106,13 @@ const Home: React.FC = () => {
               <Dropdown menu={{ items }} placement="bottomRight" className="float-left dropdown">
                 <Space>
                   <p style={{ cursor: "pointer" }} className="text-mauve font-bold text-2xl">
-                    Welcome, {user.user?.name}
+                    Welcome, {user?.name}
                   </p>
                   <Avatar
                     style={{ cursor: "pointer" }}
                     shape="circle"
                     size="large"
-                    src={user.user?.picture}
+                    src={user?.picture}
                   />
                 </Space>
               </Dropdown>
