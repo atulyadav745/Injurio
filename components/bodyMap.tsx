@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Button, Col, Input, Row, Space, Table, message } from "antd";
+import React, { useEffect, useState } from "react";
+import { Button, Col, Input, Row, Table } from "antd";
 import { ColumnsType } from "antd/es/table";
 
 interface EncircledArea {
@@ -10,11 +10,9 @@ interface EncircledArea {
 }
 
 const BodyMap: React.FC<{
+  initialAreas?: EncircledArea[];
   onUpdateEncircledAreas: (areas: EncircledArea[]) => void;
-}> = ({ onUpdateEncircledAreas }) => {
-  const [encircledAreas, setEncircledAreas] = useState<EncircledArea[]>([]);
-  const [inputValues, setInputValues] = useState<{ [key: number]: string }>({});
-
+}> = ({ onUpdateEncircledAreas: onAreasChange, initialAreas: areas = [] }) => {
   const handleAreaClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.tagName === "BUTTON") {
@@ -29,61 +27,40 @@ const BodyMap: React.FC<{
     const newArea: EncircledArea = {
       x,
       y,
-      id: encircledAreas.length + 1,
+      id: Date.now(), // Use timestamp for a unique key
       detail: "",
     };
-    setEncircledAreas([...encircledAreas, newArea]);
-    onUpdateEncircledAreas([...encircledAreas, newArea]);
+    const newAreas = [...areas, newArea];
+    onAreasChange(newAreas);
   };
 
   const handleDeleteArea = (id: number) => {
-    const updatedAreas = encircledAreas.filter((area) => area.id !== id);
-    setEncircledAreas(updatedAreas);
-    onUpdateEncircledAreas(updatedAreas);
+    const updatedAreas = areas.filter((area) => area.id !== id);
+    onAreasChange(updatedAreas);
   };
 
   const onUpdateDetails = (id: number, newDetail: string) => {
-    const updatedAreas = encircledAreas.map((area) =>
+    const updatedAreas = areas.map((area) =>
       area.id === id ? { ...area, detail: newDetail } : area
     );
-    setEncircledAreas(updatedAreas);
-    onUpdateEncircledAreas(updatedAreas);
+    onAreasChange(updatedAreas);
   };
 
   const columns: ColumnsType<EncircledArea> = [
     {
       title: "Label",
       key: "id",
-      render: (record) => <span>{record.id}</span>,
+      render: (text, record, index) => <span>{index + 1}</span>,
     },
     {
       title: "Details",
       key: "detail",
       render: (record) => (
-        <Space>
-          <Input
-            id={"detail-text-" + record.id}
-            value={inputValues[record.id] || ""}
-            onChange={(e) => {
-              const { value } = e.target;
-              setInputValues((prevInputValues) => ({
-                ...prevInputValues,
-                [record.id]: value,
-              }));
-            }}
-            />
-          <Button
-            onClick={(e) => {
-                const detailInput = document.querySelector(
-                    "#detail-text-" + record.id
-                    ) as HTMLInputElement;
-                    onUpdateDetails(record.id, detailInput.value);
-              message.success('Details Updated');
-            }}
-          >
-            Update
-          </Button>
-        </Space>
+        <Input
+          id={"detail-text-" + record.id}
+          value={record.detail}
+          onChange={(e) => onUpdateDetails(record.id, e.target.value)}
+        />
       ),
     },
   ];
@@ -93,13 +70,13 @@ const BodyMap: React.FC<{
       <Col sm={12} xs={24}>
         <div className="bodyContainer" onClick={handleAreaClick}>
           <img src="body.png" alt="Body Outline" />
-          {encircledAreas.map((area) => (
+          {areas.map((area, index) => (
             <div
               key={area.id}
               className="clickableArea center"
               style={{ left: `${area.x - 15}px`, top: `${area.y - 15}px` }}
             >
-              <span className="areaId">{area.id}</span>
+              <span className="areaId">{index + 1}</span>
               <Button
                 className="deleteButton"
                 type="primary"
@@ -117,7 +94,8 @@ const BodyMap: React.FC<{
           bordered
           pagination={{ hideOnSinglePage: true, pageSize: 5 }}
           columns={columns}
-          dataSource={encircledAreas}
+          dataSource={areas}
+          rowKey="id"
         />
       </Col>
     </Row>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useQuery, gql } from "@apollo/client";
 import { Button, Input, InputRef, Space, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { PlusOutlined, EyeOutlined, SearchOutlined } from "@ant-design/icons";
@@ -9,20 +10,35 @@ import CreateReportModal from "@/components/createReportModal";
 import EditReportModal from "@/components/editReportModal";
 import { CSVLink } from 'react-csv';
 
+const GET_INJURY_REPORTS_BY_USER = gql`
+  query InjuryReports($userId: String!) {
+    injuryReports(userId: $userId) {
+      id
+      name
+      datetime
+      created_at
+    }
+  }
+`;
+
 interface DataType {
   id: number,
   name: string;
   detail: string;
-  datetime: Date;
-  created_at: Date;
+  datetime: string;
+  created_at: string;
 }
 
 const Report: React.FC = () => {
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState(0);
-  const [data, setData] = useState([]);
   const { user } = useUser();
+
+  const { data, loading, error, refetch } = useQuery(GET_INJURY_REPORTS_BY_USER, {
+    variables: { userId: user?.sub },
+    skip: !user?.sub,
+  });
 
   const openCreateReportModal = () => {
     setCreateModalOpen(true);
@@ -30,9 +46,7 @@ const Report: React.FC = () => {
 
   const closeCreateReportModal = () => {
     setCreateModalOpen(false);
-    getReports().then((reports) => {
-      setData(reports);
-    });
+    refetch();
   };
 
   const openEditReportModal = (report: number) => {
@@ -42,9 +56,7 @@ const Report: React.FC = () => {
 
   const closeEditReportModal = () => {
     setEditModalOpen(false);
-    getReports().then((reports) => {
-      setData(reports);
-    });
+    refetch();
   };
 
   type DataIndex = keyof DataType;
@@ -119,8 +131,12 @@ const Report: React.FC = () => {
     {
       title: "Date/Time of Injury",
       dataIndex: "datetime",
-      render: (datetime) => new Date(datetime).toLocaleString(),
-      sorter: (a, b) => new Date(a.datetime).getDate() - new Date(b.datetime).getDate()
+      render: (datetime) => {
+        if (!datetime) return 'N/A';
+        const date = new Date(Number(datetime));
+        return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+      },
+      sorter: (a, b) => (new Date(Number(a.datetime)).getTime() || 0) - (new Date(Number(b.datetime)).getTime() || 0),
     },
     // {
     //   title: "Type of Injury",
@@ -130,8 +146,12 @@ const Report: React.FC = () => {
     {
       title: "Date/Time of Report",
       dataIndex: "created_at",
-      render: (datetime) => new Date(datetime).toLocaleString(),
-      sorter: (a, b) => new Date(a.created_at).getDate() - new Date(b.created_at).getDate()
+      render: (datetime) => {
+        if (!datetime) return 'N/A';
+        const date = new Date(Number(datetime));
+        return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+      },
+      sorter: (a, b) => (new Date(Number(a.created_at)).getTime() || 0) - (new Date(Number(b.created_at)).getTime() || 0),
     },
     {
       title: 'Action',
@@ -151,31 +171,6 @@ const Report: React.FC = () => {
     },
   ];
 
-  const getReports = async () => {
-    try {
-      const getReportsResponse = await fetch("/api/report/get", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: user?.sub,
-        }),
-      });
-      if (getReportsResponse.ok) {
-        return await getReportsResponse.json();
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
-  useEffect(() => {
-    getReports().then((reports) => {
-      setData(reports);
-    });
-  }, [])
-
   return (
     <>
      <div className="report-container">
@@ -189,9 +184,9 @@ const Report: React.FC = () => {
         >
           Add Report
         </Button>
-        <CreateReportModal isOpen={isCreateModalOpen} onClose={closeCreateReportModal} />
-        <EditReportModal reportId={selectedReport} isOpen={isEditModalOpen} onClose={closeEditReportModal} />
-        <CSVLink data={data}>
+        <CreateReportModal isOpen={isCreateModalOpen} onClose={closeCreateReportModal} refetchReports={refetch} />
+        <EditReportModal reportId={selectedReport} isOpen={isEditModalOpen} onClose={closeEditReportModal} refetchReports={refetch} />
+        <CSVLink data={data?.injuryReports || []}>
         <Button
          className="bg-mauve text-white hover:text-white"
          icon={<DownloadOutlined />}
@@ -203,7 +198,7 @@ const Report: React.FC = () => {
         </CSVLink>
       </div>
       <div className="table-container">
-      <Table bordered columns={columns} scroll={{ x: 'max-width' }} dataSource={data} />
+      <Table bordered columns={columns} scroll={{ x: 'max-width' }} dataSource={data?.injuryReports} loading={loading} rowKey="id" />
       </div>
       </div>
     </>

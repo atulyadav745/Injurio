@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useQuery, useMutation, gql } from '@apollo/client';
 import {
   Button,
   DatePicker,
@@ -10,6 +11,7 @@ import {
   Space,
   message,
 } from "antd";
+import dayjs from 'dayjs';
 import BodyMap from "./bodyMap";
 
 interface EncircledArea {
@@ -19,12 +21,82 @@ interface EncircledArea {
   detail: string;
 }
 
-const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId: number }> = ({
+const GET_REPORT = gql`
+  query GetReport($id: Int!) {
+    getReport(id: $id) {
+      id
+      name
+      datetime
+      injuries {
+        id
+        injuryDescription
+        x
+        y
+      }
+    }
+  }
+`;
+
+const UPDATE_INJURY_REPORT = gql`
+  mutation UpdateInjuryReport(
+    $id: Int!
+    $name: String
+    $datetime: String
+    $injuries: [InjuryDetailInput!]
+  ) {
+    updateInjuryReport(
+      id: $id
+      name: $name
+      datetime: $datetime
+      injuries: $injuries
+    ) {
+      id
+    }
+  }
+`;
+
+const DELETE_INJURY_REPORT = gql`
+  mutation DeleteInjuryReport($id: Int!) {
+    deleteInjuryReport(id: $id) {
+      id
+    }
+  }
+`;
+
+const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId: number, refetchReports: () => void; }> = ({
   isOpen,
   onClose,
-  reportId
+  reportId,
+  refetchReports
 }) => {
+  const [form] = Form.useForm();
   const [EncircledAreas, setEncircledAreas] = useState<EncircledArea[]>([]);
+
+  const { data, loading } = useQuery(GET_REPORT, {
+    variables: { id: reportId },
+    skip: !isOpen || !reportId,
+    fetchPolicy: 'network-only',
+  });
+
+  const [updateReportMutation, { loading: updating }] = useMutation(UPDATE_INJURY_REPORT);
+  const [deleteReportMutation] = useMutation(DELETE_INJURY_REPORT);
+
+  useEffect(() => {
+    if (isOpen && data?.getReport) {
+        const report = data.getReport;
+        form.setFieldsValue({
+            name: report.name,
+            datetime: report.datetime ? dayjs(Number(report.datetime)) : null,
+        });
+        const mappedAreas = report.injuries.map((injury: any) => ({
+            id: injury.id,
+            x: injury.x,
+            y: injury.y,
+            detail: injury.injuryDescription,
+        }));
+        setEncircledAreas(mappedAreas);
+    }
+  }, [data, form, isOpen]);
 
   const layout = {
     labelCol: { span: 8 },
@@ -33,84 +105,39 @@ const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId
 
   const deleteReport = async () => {
     try {
-      const deleteReportResponse = await fetch("/api/report/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          reportId: reportId,
-        }),
-      });
-
-      if (deleteReportResponse.ok) {
-        onClose();
-        message.success('Report deleted')
-      } else {
-        console.error("Error:", deleteReportResponse.statusText);
-      }
+      await deleteReportMutation({ variables: { id: reportId } });
+      message.success('Report deleted');
+      refetchReports();
+      onClose();
     } catch (error) {
       console.error("Error:", error);
+      message.error('Failed to delete report');
     }
   };
 
-  const onSave = (values: any) => {
-    const saveInjury = async (injury: EncircledArea, reportId: number) => {
-      try {
-        const createInjuryResponse = await fetch("/api/injury/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            id: injury.id,
-            reportId: reportId,
-            xPos: injury.x,
-            yPos: injury.y,
-            detail: injury.detail,
-          }),
-        });
+  const onSave = async (values: any) => {
+    try {
+      const injuriesToSave = EncircledAreas.map(area => ({
+        injuryDescription: area.detail,
+        x: area.x,
+        y: area.y,
+      }));
 
-        if (!createInjuryResponse.ok) {
-          console.error("Error:", createInjuryResponse.statusText);
+      await updateReportMutation({
+        variables: {
+          id: reportId,
+          name: values.name,
+          datetime: values.datetime?.toISOString(),
+          injuries: injuriesToSave,
         }
-      } catch (error) {
-        console.error("Error:", error);
-      }
-    };
-
-    const saveReport = async () => {
-      try {
-        const createReportResponse = await fetch("/api/report/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            // userId: user?.sub,
-            name: values.name,
-            datetime: values.datetime,
-          }),
-        });
-
-        if (createReportResponse.ok) {
-          const data = await createReportResponse.json();
-          return data.id;
-        } else {
-          console.error("Error:", createReportResponse.statusText);
-        }
-      } catch (error) {
-        console.error("Error:", error);
-      }
-    };
-
-    saveReport().then((id) => {
-      EncircledAreas.forEach((encircleAria: EncircledArea) => {
-        saveInjury(encircleAria, id);
       });
-      message.success("Report Saved");
+      message.success('Report updated');
+      refetchReports();
       onClose();
-    });
+    } catch (e) {
+      console.error(e);
+      message.error('Failed to update report');
+    }
   };
 
   function updateEncircledAreas(areas: EncircledArea[]): void {
@@ -120,7 +147,7 @@ const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId
   return (
     <>
       <Modal
-        title="Edit Report"
+        title={loading ? "Loading Report..." : "Edit Report"}
         centered
         open={isOpen}
         maskClosable={false}
@@ -130,7 +157,7 @@ const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId
         footer={null}
       >
         <Divider />
-        <Form {...layout} name="control-hooks" onFinish={onSave}>
+        <Form {...layout} form={form} name="control-hooks" onFinish={onSave}>
           <Form.Item name="name" label="Name">
             <Input />
           </Form.Item>
@@ -138,7 +165,7 @@ const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId
             <DatePicker showTime />
           </Form.Item>
           <Divider />
-          <BodyMap onUpdateEncircledAreas={updateEncircledAreas} />
+          <BodyMap onUpdateEncircledAreas={updateEncircledAreas} initialAreas={EncircledAreas} />
           <Divider />
           <Form.Item wrapperCol={{ span: 24 }}>
             <Space style={{ float: "right" }}>
@@ -163,6 +190,7 @@ const EditReportModal: React.FC<{ isOpen: boolean; onClose: () => void; reportId
                 type="primary"
                 className="bg-mauve"
                 htmlType="submit"
+                loading={updating}
                 size="large"
                 style={{ padding: "0 40px" }}
               >

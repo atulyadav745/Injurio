@@ -54,19 +54,21 @@
   font-weight: bold;
   font-size: large;
   cursor: pointer;
-  /* Hide the delete button by default */
-  .deleteButton {
-    display: none;
-  }
-
-  /* Show the delete button when the parent is being hovered */
-  &:hover .deleteButton {
-    display: block;
-  }
-  &:hover .areaId {
-    display: none;
-  }
 }
+
+/* Hide the delete button by default */
+.clickableArea .deleteButton {
+  display: none;
+}
+
+/* Show the delete button when the parent is being hovered */
+.clickableArea:hover .deleteButton {
+  display: block;
+}
+.clickableArea:hover .areaId {
+  display: none;
+}
+
 .nav-links ul li a::after {
   content: "";
   width: 0%;

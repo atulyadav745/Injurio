@@ -30,5 +30,6 @@ model InjuryDetail {
 model User {
   id      String         @id
   name    String
+  email   String         @unique
   reports InjuryReport[]
 }
