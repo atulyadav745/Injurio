@@ -1,11 +1,12 @@
 import React from 'react';
 import { Button, Space } from 'antd';
 import { useUser } from '@auth0/nextjs-auth0/client'
-import Lottie from "lottie-react";
 import animation from "../assets/doctor.json"
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import dynamic from 'next/dynamic';
 
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 const Login: React.FC = () => {
   const { user, error, isLoading } = useUser();

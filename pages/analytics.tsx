@@ -1,6 +1,7 @@
 import { useUser } from "@auth0/nextjs-auth0/client";
 import dayjs from "dayjs";
 import React, { useEffect, useState } from "react";
+import { useQuery, gql } from '@apollo/client';
 import { Bar, Line} from "react-chartjs-2";
 import {
   CategoryScale,
@@ -29,6 +30,14 @@ Chart.register([
   BarElement,
 ]);
 
+const GET_INJURY_REPORTS_BY_USER = gql`
+  query InjuryReports($userId: String!) {
+    injuryReports(userId: $userId) {
+      datetime
+    }
+  }
+`;
+
 const Analytics = () => {
   const user = useUser();
   const [chartData, setChartData] = useState<{
@@ -39,6 +48,11 @@ const Analytics = () => {
     data: [],
   });
   const [selectedChartType, setSelectedChartType] = useState("bar");
+
+  const { data: queryData } = useQuery(GET_INJURY_REPORTS_BY_USER, {
+    variables: { userId: user.user?.sub },
+    skip: !user.user?.sub,
+  });
 
   const items: MenuProps["items"] = [
     {
@@ -52,44 +66,28 @@ const Analytics = () => {
   ];
 
   useEffect(() => {
-    const getReportData = async () => {
-      try {
-        const getReportsResponse = await fetch("/api/report/get", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: user.user?.sub,
-          }),
-        });
-        if (getReportsResponse.ok) {
-          const reports = await getReportsResponse.json();
-          const countsMap: { [key: string]: number } = {};
+    if (queryData) {
+      const reports = queryData.injuryReports;
+      const countsMap: { [key: string]: number } = {};
 
-          reports.forEach((element: any) => {
-            const label: string =
-              (dayjs(element.datetime).month() + 1).toString() +
-              "/" +
-              dayjs(element.datetime).year().toString();
+      reports.forEach((element: any) => {
+        const label: string =
+          (dayjs(Number(element.datetime)).month() + 1).toString() +
+          "/" +
+          dayjs(Number(element.datetime)).year().toString();
 
-            if (label in countsMap) {
-              countsMap[label]++;
-            } else {
-              countsMap[label] = 1;
-            }
-          });
-
-          const labels = Object.keys(countsMap);
-          const data = Object.values(countsMap);
-          setChartData({ labels, data });
+        if (label in countsMap) {
+          countsMap[label]++;
+        } else {
+          countsMap[label] = 1;
         }
-      } catch (error) {
-        console.error("Error:", error);
-      }
-    };
-    getReportData();
-  }, [user]);
+      });
+
+      const labels = Object.keys(countsMap);
+      const data = Object.values(countsMap);
+      setChartData({ labels, data });
+    }
+  }, [queryData]);
 
   const options = {
     responsive: true,

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Button, DatePicker, Divider, Form, Input, Modal, Space, message } from "antd";
+import { useMutation, gql } from '@apollo/client';
 import { useUser } from "@auth0/nextjs-auth0/client";
 import BodyMap from "./bodyMap";
 
@@ -10,9 +11,26 @@ interface EncircledArea {
   detail: string;
 }
 
-const CreateReportModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
+const CREATE_INJURY_REPORT = gql`
+  mutation CreateInjuryReport($userId: String!, $name: String!, $datetime: String!) {
+    createInjuryReport(userId: $userId, name: $name, datetime: $datetime) {
+      id
+    }
+  }
+`;
+
+const CREATE_INJURY_DETAIL = gql`
+  mutation CreateInjuryDetail($reportId: Int!, $injuryDescription: String!, $x: Float!, $y: Float!) {
+    createInjuryDetail(reportId: $reportId, injuryDescription: $injuryDescription, x: $x, y: $y) {
+      id
+    }
+  }
+`;
+
+const CreateReportModal: React.FC<{ isOpen: boolean; onClose: () => void, refetchReports: () => void }> = ({
   isOpen,
   onClose,
+  refetchReports
 }) => {
   const { user } = useUser();
   const [EncircledAreas, setEncircledAreas] = useState<EncircledArea[]>([]);
@@ -22,63 +40,42 @@ const CreateReportModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     wrapperCol: { span: 16 },
   };
 
-  const onSave = (values: any) => {
-    const saveInjury = async (injury: EncircledArea, reportId: number) => {
-      try {
-        const createInjuryResponse = await fetch("/api/injury/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            id: injury.id,
-            reportId: reportId,
-            xPos: injury.x,
-            yPos: injury.y,
-            detail: injury.detail,
-          }),
-        });
+  const [createInjuryReport, { loading: creatingReport }] = useMutation(CREATE_INJURY_REPORT);
+  const [createInjuryDetail, { loading: creatingDetail }] = useMutation(CREATE_INJURY_DETAIL);
 
-        if (!createInjuryResponse.ok) {
-          console.error("Error:", createInjuryResponse.statusText);
-        }
-      } catch (error) {
-        console.error("Error:", error);
-      }
-    };
-
-    const saveReport = async () => {
-      try {
-        const createReportResponse = await fetch("/api/report/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: user?.sub,
-            name: values.name,
-            datetime: values.datetime,
-          }),
-        });
-
-        if (createReportResponse.ok) {
-          const data = await createReportResponse.json();
-          return data.id;
-        } else {
-          console.error("Error:", createReportResponse.statusText);
-        }
-      } catch (error) {
-        console.error("Error:", error);
-      }
-    };
-
-    saveReport().then((id) => {
-      EncircledAreas.forEach((encircleAria: EncircledArea) => {
-        saveInjury(encircleAria, id);
+  const onSave = async (values: any) => {
+    try {
+      const reportResult = await createInjuryReport({
+        variables: {
+          userId: user?.sub,
+          name: values.name,
+          datetime: values.datetime.toISOString(),
+        },
       });
-      message.success('Report Saved');
+
+      const reportId = reportResult.data.createInjuryReport.id;
+
+      if (reportId) {
+        await Promise.all(
+          EncircledAreas.map((area) =>
+            createInjuryDetail({
+              variables: {
+                reportId: reportId,
+                injuryDescription: area.detail,
+                x: area.x,
+                y: area.y,
+              },
+            })
+          )
+        );
+      }
+      message.success("Report Saved");
+      refetchReports();
       onClose();
-    });
+    } catch (e) {
+      console.error(e);
+      message.error("Failed to save report");
+    }
   };
 
   function updateEncircledAreas(areas: EncircledArea[]): void {
@@ -106,7 +103,7 @@ const CreateReportModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             <DatePicker showTime />
           </Form.Item>
           <Divider />
-          <BodyMap onUpdateEncircledAreas={updateEncircledAreas} />
+          <BodyMap onUpdateEncircledAreas={updateEncircledAreas} initialAreas={EncircledAreas} />
           <Divider />
           <Form.Item wrapperCol={{ span: 24 }}>
             <Space style={{ float: "right" }}>
@@ -121,7 +118,8 @@ const CreateReportModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               <Button
                 type="primary"
                 className="bg-mauve"
-                htmlType="submit"
+                    htmlType="submit"                    
+                    loading={creatingReport || creatingDetail}
                 size="large"
                 style={{ padding: "0 40px" }}
               >

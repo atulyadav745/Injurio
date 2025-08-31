@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import React, { useEffect, useState } from 'react';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import logo from "../assets/logo.png"
 import {
   Avatar,
@@ -19,68 +19,57 @@ import Head from "next/head";
 import { BarChartOutlined, FileTextOutlined } from "@ant-design/icons";
 import Analytics from "@/pages/analytics";
 import Footer from "./Footer";
+import { useQuery, useMutation, gql } from '@apollo/client';
+
+const GET_USER = gql`
+  query GetUser($id: String!) {
+    getUser(id: $id) {
+      id
+    }
+  }
+`;
+
+const CREATE_USER = gql`
+  mutation CreateUser($id: String!, $name: String!, $email: String!) {
+    createUser(id: $id, name: $name, email: $email) {
+      id
+    }
+  }
+`;
 
 const { Header, Content } = Layout;
 
 const Home: React.FC = () => {
-  const user = useUser();
+  const { user } = useUser();
   const [SelectedMenu, setSelectedMenu] = useState('Reports')
   const {
     token: { colorBgContainer },
   } = theme.useToken();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        // Fetch existing user data
-        const getUserResponse = await fetch("/api/user/get", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            id: user.user?.sub,
-          }),
-        });
+  const [createUserMutation] = useMutation(CREATE_USER);
+  const { data: userData, loading: userLoading } = useQuery(GET_USER, {
+    variables: { id: user?.sub },
+    skip: !user,
+  });
 
-        if (getUserResponse.ok) {
-          const data = await getUserResponse.json();
-          if (!data.found) {
-            createUser();
-          }
-        } else {
-          console.error("Error:", getUserResponse.statusText);
+  useEffect(() => {
+    const syncUser = async () => {
+      if (user && !userLoading && userData && !userData.getUser) {
+        try {
+          await createUserMutation({
+            variables: {
+              id: user.sub,
+              name: user.name,
+              email: user.email,
+            },
+          });
+        } catch (e) {
+          console.error("Error creating user:", e);
         }
-      } catch (error) {
-        console.error("Error:", error);
       }
     };
-
-    const createUser = async () => {
-      try {
-        const createUserResponse = await fetch(
-          "/api/user/create",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              id: user.user?.sub,
-              name: user.user?.nickname,
-            }),
-          }
-        );
-        if (!createUserResponse.ok) {
-          console.error("Error:", createUserResponse.statusText);
-        }
-      } catch (error) {
-        console.error("Error:", error);
-      }
-    }
-
-    fetchUser();
-  }, [user]);
+    syncUser();
+  }, [user, userData, userLoading, createUserMutation]);
 
   const items: MenuProps["items"] = [
     {
